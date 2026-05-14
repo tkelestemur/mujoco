@@ -14,15 +14,17 @@
 # ==============================================================================
 
 """DO NOT EDIT. This file is auto-generated."""
+
 import dataclasses
 import functools
+
 import jax
-from mujoco.mjx._src import types
-from mujoco.mjx.warp import ffi
-import mujoco.mjx.third_party.mujoco_warp as mjwarp
-from mujoco.mjx.third_party.mujoco_warp._src import types as mjwp_types
 import warp as wp
 
+from mujoco.mjx._src import types
+import mujoco.mjx.third_party.mujoco_warp as mjwarp
+from mujoco.mjx.third_party.mujoco_warp._src import types as mjwp_types
+from mujoco.mjx.warp import ffi
 
 _m = mjwarp.Model(
     **{f.name: None for f in dataclasses.fields(mjwarp.Model) if f.init}
@@ -2288,6 +2290,7 @@ def _step_shim(
     qLD_all_updates: wp.array[wp.vec3i],
     qLD_level_offsets: wp.array[int],
     qLD_updates: tuple[wp.array[wp.vec3i], ...],
+    qM_fullm_elemid: wp.array2d[int],
     qM_fullm_i: wp.array[int],
     qM_fullm_j: wp.array[int],
     qM_mulm_col: wp.array[int],
@@ -2804,6 +2807,7 @@ def _step_shim(
   _m.qLD_all_updates = qLD_all_updates
   _m.qLD_level_offsets = qLD_level_offsets
   _m.qLD_updates = qLD_updates
+  _m.qM_fullm_elemid = qM_fullm_elemid
   _m.qM_fullm_i = qM_fullm_i
   _m.qM_fullm_j = qM_fullm_j
   _m.qM_mulm_col = qM_mulm_col
@@ -3673,6 +3677,7 @@ def _step_jax_impl(m: types.Model, d: types.Data):
       m._impl.qLD_all_updates,
       m._impl.qLD_level_offsets,
       m._impl.qLD_updates,
+      m._impl.qM_fullm_elemid,
       m._impl.qM_fullm_i,
       m._impl.qM_fullm_j,
       m._impl.qM_mulm_col,

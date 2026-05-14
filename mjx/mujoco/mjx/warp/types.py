@@ -15,14 +15,18 @@
 """MJX Warp types.
 DO NOT EDIT. This file is auto-generated.
 """
+
 import dataclasses
 import typing
 from typing import Tuple
+
 import jax
 from jax import tree_util
 from jax.interpreters import batching
-from mujoco.mjx._src import dataclasses as mjx_dataclasses
 import numpy as np
+
+from mujoco.mjx._src import dataclasses as mjx_dataclasses
+
 if typing.TYPE_CHECKING:
   GraphMode = int
 
@@ -33,6 +37,7 @@ if typing.TYPE_CHECKING:
 else:
   try:
     from warp._src.jax_experimental.ffi import GraphMode
+
     from mujoco.mjx.third_party.mujoco_warp._src import types as mjwp_types
 
     Callback = mjwp_types.Callback
@@ -40,6 +45,7 @@ else:
     GraphMode = int
     Callback = None
 PyTreeNode = mjx_dataclasses.PyTreeNode
+
 
 @dataclasses.dataclass(frozen=True)
 @tree_util.register_pytree_node_class
@@ -52,6 +58,7 @@ class TileSet:
     adr: address of each tile in the set
     size: size of all the tiles in this set
   """
+
   adr: np.ndarray
   size: int
 
@@ -72,6 +79,7 @@ class BlockDim:
 
   TODO(team): experimental and may be removed
   """
+
   actuator_velocity: int
   cholesky_factorize: int
   cholesky_factorize_solve: int
@@ -102,10 +110,13 @@ class BlockDim:
 
 class StatisticWarp(PyTreeNode):
   """Derived fields from Statistic."""
+
   meaninertia: jax.Array
+
 
 class OptionWarp(PyTreeNode):
   """Derived fields from Option."""
+
   broadphase: int
   broadphase_filter: int
   ccd_iterations: int
@@ -120,8 +131,10 @@ class OptionWarp(PyTreeNode):
   sdf_initpoints: int
   sdf_iterations: int
 
+
 class ModelWarp(PyTreeNode):
   """Derived fields from Model."""
+
   M_colind: np.ndarray
   M_rowadr: np.ndarray
   M_rownnz: np.ndarray
@@ -236,9 +249,12 @@ class ModelWarp(PyTreeNode):
   oct_coeff: np.ndarray
   plugin: np.ndarray
   plugin_attr: np.ndarray
+  qD_fullm_i: np.ndarray
+  qD_fullm_j: np.ndarray
   qLD_all_updates: np.ndarray
   qLD_level_offsets: np.ndarray
   qLD_updates: Tuple[np.ndarray, ...]
+  qM_fullm_elemid: np.ndarray
   qM_fullm_i: np.ndarray
   qM_fullm_j: np.ndarray
   qM_mulm_col: np.ndarray
@@ -283,8 +299,10 @@ class ModelWarp(PyTreeNode):
   wrap_site_adr: np.ndarray
   wrap_site_pair_adr: np.ndarray
 
+
 class DataWarp(PyTreeNode):
   """Derived fields from Data."""
+
   actuator_moment: jax.Array
   actuator_velocity: jax.Array
   cacc: jax.Array
@@ -363,6 +381,8 @@ class DataWarp(PyTreeNode):
   wrap_obj: jax.Array
   wrap_xpos: jax.Array
   shape = property(lambda self: self.cacc.shape)
+
+
 DATA_NON_VMAP = {
     'contact__dim',
     'contact__dist',
@@ -389,6 +409,7 @@ DATA_NON_VMAP = {
     'njmax_pad',
     'nworld',
 }
+
 
 def _to_elt(cont, _, d, axis):
   return DataWarp(**{
@@ -779,6 +800,7 @@ _NDIM = {
         'mesh_vertnum': 1,
         'mocap_bodyid': 1,
         'nC': 0,
+        'nD': 0,
         'nJfe': 0,
         'nJmom': 0,
         'nJten': 0,
@@ -879,9 +901,12 @@ _NDIM = {
         'pair_solreffriction': 3,
         'plugin': 1,
         'plugin_attr': 2,
+        'qD_fullm_i': 1,
+        'qD_fullm_j': 1,
         'qLD_all_updates': 2,
         'qLD_level_offsets': 1,
         'qLD_updates': -1,
+        'qM_fullm_elemid': 2,
         'qM_fullm_i': 1,
         'qM_fullm_j': 1,
         'qM_mulm_col': 1,
@@ -1361,6 +1386,7 @@ _BATCH_DIM = {
         'mesh_vertnum': False,
         'mocap_bodyid': False,
         'nC': False,
+        'nD': False,
         'nJfe': False,
         'nJmom': False,
         'nJten': False,
@@ -1461,9 +1487,12 @@ _BATCH_DIM = {
         'pair_solreffriction': True,
         'plugin': False,
         'plugin_attr': False,
+        'qD_fullm_i': False,
+        'qD_fullm_j': False,
         'qLD_all_updates': False,
         'qLD_level_offsets': False,
         'qLD_updates': False,
+        'qM_fullm_elemid': False,
         'qM_fullm_i': False,
         'qM_fullm_j': False,
         'qM_mulm_col': False,

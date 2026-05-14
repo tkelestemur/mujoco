@@ -19,16 +19,17 @@ from absl.testing import absltest
 from absl.testing import parameterized
 import jax
 from jax import numpy as jp
+import numpy as np
+
 import mujoco
 from mujoco import mjx
 from mujoco.mjx._src import bvh
 from mujoco.mjx._src import forward
 from mujoco.mjx._src import io
 from mujoco.mjx._src import render
-import mujoco.mjx.warp as mjxw
 from mujoco.mjx.warp import test_util as tu
 from mujoco.mjx.warp import warp as wp  # pylint: disable=g-importing-member
-import numpy as np
+import mujoco.mjx.warp as mjxw
 
 _FORCE_TEST = os.environ.get('MJX_WARP_FORCE_TEST', '0') == '1'
 
@@ -338,6 +339,44 @@ class RenderContextGarbageCollectionTest(absltest.TestCase):
         if isinstance(k, tuple) and k[0] == key_b
     ]
     self.assertEmpty(matching_b)
+
+
+class RenderContextConfigTest(absltest.TestCase):
+  """Tests render context configuration that does not require CUDA rendering."""
+
+  def setUp(self):
+    super().setUp()
+    if mjxw.WARP_INSTALLED:
+      wp.config.kernel_cache_dir = (
+          '/tmp/wp_kernel_cache_dir_RenderContextConfigTest'
+      )
+
+  def test_render_context_preserves_render_options(self):
+    if not mjxw.WARP_INSTALLED:
+      self.skipTest('Warp not installed.')
+
+    xml = """
+    <mujoco>
+      <worldbody>
+        <camera name="cam" pos="0 -3 1" xyaxes="1 0 0 0 0.25 1"
+                resolution="4 4" output="rgb"/>
+        <geom type="sphere" pos="0 0 0.5" size="0.5" rgba="1 0 0 1"/>
+      </worldbody>
+    </mujoco>
+    """
+    mjm = mujoco.MjModel.from_xml_string(xml)
+
+    rc = mjx.create_render_context(
+        mjm=mjm,
+        nworld=1,
+        cam_res=(4, 4),
+        render_rgb=True,
+        use_ambient_lighting=False,
+        enable_backface_culling=False,
+    )
+
+    self.assertFalse(rc.use_ambient_lighting)
+    self.assertFalse(rc.enable_backface_culling)
 
 
 if __name__ == '__main__':

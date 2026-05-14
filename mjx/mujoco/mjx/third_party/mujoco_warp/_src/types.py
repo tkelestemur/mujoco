@@ -17,9 +17,10 @@ import enum
 from typing import Callable
 
 import mujoco
-from mujoco.mjx.third_party.mujoco_warp._src.util_pkg import check_version
 import numpy as np
 import warp as wp
+
+from mujoco.mjx.third_party.mujoco_warp._src.util_pkg import check_version
 
 MJ_MINVAL = mujoco.mjMINVAL
 MJ_MAXVAL = mujoco.mjMAXVAL
@@ -27,8 +28,7 @@ MJ_MINIMP = mujoco.mjMINIMP  # minimum constraint impedance
 MJ_MAXIMP = mujoco.mjMAXIMP  # maximum constraint impedance
 MJ_MAXCONPAIR = mujoco.mjMAXCONPAIR
 MJ_MINMU = mujoco.mjMINMU  # minimum friction
-# True if MuJoCo >= 3.9.0 (new margin/gap semantics: includemargin = margin)
-_NEW_GAP_SEMANTICS = check_version("mujoco>=3.9.0")
+NEW_GAP_SEMANTICS = check_version("mujoco>=3.9.0.dev914519929")
 # maximum size (by number of edges) of an horizon in EPA algorithm
 MJ_MAX_EPAHORIZON = 24
 # maximum average number of trianglarfaces EPA can insert at each iteration
@@ -861,6 +861,7 @@ class Model:
     ntree: number of kinematic trees
     nM: number of non-zeros in sparse inertia matrix
     nC: number of non-zeros in sparse body-dof matrix
+    nD: number of non-zeros in sparse derivative matrix
     ngeom: number of geoms
     nsite: number of sites
     ncam: number of cameras
@@ -1249,6 +1250,9 @@ class Model:
     qLD_level_offsets: tuple of start offsets for each level
     qM_fullm_i: sparse mass matrix addressing
     qM_fullm_j: sparse mass matrix addressing
+    qM_fullm_elemid: (row, col) -> elemid into qM_fullm_i/qM_fullm_j; -1 if not a chain ancestor
+    qD_fullm_i: D-structure row indices for RNE derivatives
+    qD_fullm_j: D-structure column indices for RNE derivatives
     qM_mulm_rowadr: sparse matmul row pointers
     qM_mulm_col: sparse matmul column indices
     qM_mulm_madr: sparse matmul matrix addresses
@@ -1264,6 +1268,7 @@ class Model:
   ntree: int
   nM: int
   nC: int
+  nD: int
   ngeom: int
   nsite: int
   ncam: int
@@ -1641,6 +1646,9 @@ class Model:
   qLD_level_offsets: wp.array[int]
   qM_fullm_i: wp.array[int]
   qM_fullm_j: wp.array[int]
+  qM_fullm_elemid: wp.array2d[int]  # (row, col) -> elemid in qM_fullm_i/j; -1 if col is not a chain ancestor of row
+  qD_fullm_i: wp.array[int]  # D-structure (full square) row indices for RNE derivatives
+  qD_fullm_j: wp.array[int]  # D-structure (full square) column indices for RNE derivatives
   # Gather-based sparse mul_m indices (thread per DOF, no atomics)
   qM_mulm_rowadr: wp.array[int]  # start address for each row [nv+1]
   qM_mulm_col: wp.array[int]  # column index to gather from
@@ -1952,6 +1960,7 @@ class RenderContext:
     cam_id_map: camera id map
     use_textures: whether to use textures
     use_shadows: whether to use shadows
+    use_ambient_lighting: whether to use ambient lighting
     use_precomputed_rays: whether to use precomputed rays
     bvh_ngeom: number of geometries in the BVH
     enabled_geom_ids: enabled geometry ids
@@ -1993,6 +2002,11 @@ class RenderContext:
     render_skybox: whether to shade missed rays with the MuJoCo skybox texture
     skybox_tex_id: index into textures of the skybox (MuJoCo tex_type == SKYBOX), -1 if none
     skybox_face_width: pixel width of one skybox cube face (0 if no skybox)
+    enable_backface_culling: drop primitive ray hits whose normal faces away
+      from the ray (i.e. the ray origin is inside the geom). Matches MuJoCo's
+      mesh-ray rule. When False, the renderer reports inner-surface hits, which
+      is faster but causes a camera placed inside a geom to render that geom's
+      back wall.
   """
 
   nrender: int
@@ -2000,6 +2014,7 @@ class RenderContext:
   cam_id_map: array("ncam", int)
   use_textures: bool
   use_shadows: bool
+  use_ambient_lighting: bool
   background_color: wp.uint32
   use_precomputed_rays: bool
   render_skybox: bool
@@ -2045,3 +2060,4 @@ class RenderContext:
   render_seg: array("ncam", bool)
   znear: float
   total_rays: int
+  enable_backface_culling: bool

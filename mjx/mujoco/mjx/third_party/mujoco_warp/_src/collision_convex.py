@@ -35,7 +35,7 @@ from mujoco.mjx.third_party.mujoco_warp._src.types import MJ_MAX_EPAFACES
 from mujoco.mjx.third_party.mujoco_warp._src.types import MJ_MAX_EPAHORIZON
 from mujoco.mjx.third_party.mujoco_warp._src.types import MJ_MAXCONPAIR
 from mujoco.mjx.third_party.mujoco_warp._src.types import MJ_MAXVAL
-from mujoco.mjx.third_party.mujoco_warp._src.types import _NEW_GAP_SEMANTICS
+from mujoco.mjx.third_party.mujoco_warp._src.types import NEW_GAP_SEMANTICS
 from mujoco.mjx.third_party.mujoco_warp._src.types import Data
 from mujoco.mjx.third_party.mujoco_warp._src.types import DisableBit
 from mujoco.mjx.third_party.mujoco_warp._src.types import GeomType
@@ -774,7 +774,7 @@ def ccd_kernel_builder(
     if is_collision_sensor:
       cutoff = 1.0e32
     else:
-      if wp.static(_NEW_GAP_SEMANTICS):
+      if wp.static(NEW_GAP_SEMANTICS):
         cutoff = gap
       else:
         cutoff = 0.0
@@ -797,7 +797,7 @@ def ccd_kernel_builder(
       epa_horizon_in[ccdid],
     )
 
-    if wp.static(_NEW_GAP_SEMANTICS):
+    if wp.static(NEW_GAP_SEMANTICS):
       if dist >= gap and pairid[1] == -1:
         return 0
     else:
