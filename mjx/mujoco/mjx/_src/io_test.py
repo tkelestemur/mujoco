@@ -113,6 +113,21 @@ _SIMPLE_BODY = """
   </mujoco>
 """
 
+_TEXTURE_SWAP = """
+  <mujoco>
+    <asset>
+      <texture name="red" type="2d" builtin="flat" width="4" height="4"
+        rgb1="1 0 0" rgb2="1 0 0"/>
+      <texture name="green" type="2d" builtin="flat" width="4" height="4"
+        rgb1="0 1 0" rgb2="0 1 0"/>
+      <material name="mat" texture="red"/>
+    </asset>
+    <worldbody>
+      <geom type="plane" size="1 1 .1" material="mat"/>
+    </worldbody>
+  </mujoco>
+"""
+
 _LIGHTS = """
   <mujoco>
     <worldbody>
@@ -370,6 +385,58 @@ class ModelIOTest(parameterized.TestCase):
 
     expected = graph_mode or mjxw_types.GraphMode.WARP
     self.assertEqual(mx.opt._impl.graph_mode, expected)
+
+  def test_expand_mat_texid_warp(self):
+    """Tests per-world material texture ids can be expanded and replaced."""
+    if not mjxw.WARP_INSTALLED:
+      self.skipTest('Warp not installed.')
+
+    m = mujoco.MjModel.from_xml_string(_TEXTURE_SWAP)
+    mx = mjx.put_model(m, impl='warp', device=jax.devices('cpu')[0])
+    nrole = mx.mat_texid.shape[-1]
+    self.assertEqual(tuple(mx.mat_texid.shape), (m.nmat, nrole))
+    self.assertTrue(hasattr(mjxw.mujoco_warp, 'expand_mat_texid'))
+
+    expanded = mjx.expand_mat_texid(mx, nworld=3)
+    self.assertEqual(tuple(expanded.mat_texid.shape), (3, m.nmat, nrole))
+    for worldid in range(3):
+      np.testing.assert_array_equal(
+          np.asarray(expanded.mat_texid[worldid]),
+          np.asarray(mx.mat_texid),
+      )
+
+    same = mjx.expand_mat_texid(expanded, nworld=3)
+    self.assertIs(same, expanded)
+
+    red_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_TEXTURE, 'red')
+    green_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_TEXTURE, 'green')
+    mat_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_MATERIAL, 'mat')
+    mat_texid = expanded.mat_texid.at[:, mat_id, 1].set(
+        jp.array([red_id, green_id, red_id], dtype=expanded.mat_texid.dtype)
+    )
+    updated = expanded.replace(mat_texid=mat_texid)
+    np.testing.assert_array_equal(
+        np.asarray(updated.mat_texid[:, mat_id, 1]),
+        np.array([red_id, green_id, red_id]),
+    )
+
+  def test_expand_mat_texid_errors(self):
+    if not mjxw.WARP_INSTALLED:
+      self.skipTest('Warp not installed.')
+
+    m = mujoco.MjModel.from_xml_string(_TEXTURE_SWAP)
+    mx = mjx.put_model(m, impl='warp', device=jax.devices('cpu')[0])
+
+    with self.assertRaisesRegex(ValueError, 'nworld must be positive'):
+      mjx.expand_mat_texid(mx, nworld=0)
+
+    expanded = mjx.expand_mat_texid(mx, nworld=3)
+    with self.assertRaisesRegex(ValueError, 'already has 3 world tables'):
+      mjx.expand_mat_texid(expanded, nworld=2)
+
+    jax_mx = mjx.put_model(m, impl='jax')
+    with self.assertRaisesRegex(ValueError, 'only implemented for Warp'):
+      mjx.expand_mat_texid(jax_mx, nworld=2)
 
   def test_unsupported_contact_types(self):
     """Tests that unsupported contact types raise an error."""

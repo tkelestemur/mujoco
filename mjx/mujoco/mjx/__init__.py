@@ -35,6 +35,7 @@ from mujoco.mjx._src.forward import implicit
 from mujoco.mjx._src.forward import rungekutta4
 from mujoco.mjx._src.inverse import inverse
 from mujoco.mjx._src.io import create_render_context
+from mujoco.mjx._src.io import expand_mat_texid
 from mujoco.mjx._src.io import get_data
 from mujoco.mjx._src.io import get_data_into
 from mujoco.mjx._src.io import get_state

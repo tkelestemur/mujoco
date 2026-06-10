@@ -53,6 +53,9 @@ else:
 
   class _MjwpStub:
 
+    def expand_mat_texid(self, *args, **kwargs):
+      pass
+
     def put_model(self, *args, **kwargs):
       pass
 

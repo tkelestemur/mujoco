@@ -557,6 +557,70 @@ def put_model(
     raise ValueError(f'Unsupported implementation: {impl}')
 
 
+def _expand_mat_texid_array(
+    mat_texid: jax.Array, nworld: int, nmat: int
+) -> jax.Array:
+  """Expands a shared material texture table to per-world tables."""
+  current_shape = tuple(mat_texid.shape)
+  if len(current_shape) < 2:
+    raise ValueError(
+        f'm.mat_texid has shape {current_shape}; expected at least 2 dims.'
+    )
+
+  nrole = current_shape[-1]
+  expected_shape = (nworld, nmat, nrole)
+  if current_shape == expected_shape:
+    return mat_texid
+
+  shared_shape = (nmat, nrole)
+  shared_batched_shape = (1, nmat, nrole)
+  if current_shape == shared_shape:
+    mat_texid = jp.expand_dims(mat_texid, 0)
+  elif current_shape != shared_batched_shape:
+    if len(current_shape) == 3:
+      raise ValueError(
+          f'm.mat_texid already has {current_shape[0]} world tables; '
+          f'expected 1 or {nworld}. Assign into m.mat_texid to update '
+          'existing per-world storage.'
+      )
+    raise ValueError(
+        f'm.mat_texid has shape {current_shape}; expected {shared_shape}, '
+        f'{shared_batched_shape}, or {expected_shape}.'
+    )
+
+  return jp.repeat(mat_texid, nworld, axis=0)
+
+
+def expand_mat_texid(m: types.Model, nworld: int) -> types.Model:
+  """Expands material texture ids for per-world texture assignment.
+
+  Warp-backed MJX models start with one shared material texture table. Call this
+  once before graph capture when different worlds need different material
+  texture ids. Since MJX models are immutable pytrees, this returns a replaced
+  model instead of mutating `m` in place.
+
+  Texture ids must refer to textures already present in the compiled
+  `mujoco.MjModel` used to create the render context.
+
+  Args:
+    m: The MJX model returned by `put_model(..., impl='warp')`.
+    nworld: The number of per-world material texture tables to allocate.
+
+  Returns:
+    A model whose `mat_texid` has shape
+    `(nworld, nmat, mjNTEXROLE)`.
+  """
+  if m.impl != types.Impl.WARP:
+    raise ValueError('expand_mat_texid is only implemented for Warp models.')
+  if nworld < 1:
+    raise ValueError(f'nworld must be positive, got {nworld}.')
+
+  mat_texid = _expand_mat_texid_array(m.mat_texid, nworld, m.nmat)
+  if mat_texid is m.mat_texid:
+    return m
+  return m.replace(mat_texid=mat_texid)
+
+
 def _make_data_public_fields(m: types.Model) -> Dict[str, Any]:
   """Create public fields for the Data object."""
   float_ = jp.zeros(1, float).dtype

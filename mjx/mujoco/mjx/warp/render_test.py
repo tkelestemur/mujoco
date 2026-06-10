@@ -32,6 +32,32 @@ import numpy as np
 
 _FORCE_TEST = os.environ.get('MJX_WARP_FORCE_TEST', '0') == '1'
 
+_TEXTURE_SWAP_XML = """
+<mujoco>
+  <asset>
+    <texture name="red" type="2d" builtin="flat" width="4" height="4"
+      rgb1="1 0 0" rgb2="1 0 0"/>
+    <texture name="green" type="2d" builtin="flat" width="4" height="4"
+      rgb1="0 1 0" rgb2="0 1 0"/>
+    <material name="mat" texture="red" rgba="1 1 1 1" texrepeat="1 1"/>
+  </asset>
+  <worldbody>
+    <camera name="cam" pos="0 0 2" xyaxes="1 0 0 0 1 0"/>
+    <geom name="plane" type="plane" size="2 2 0.1" material="mat"/>
+  </worldbody>
+</mujoco>
+"""
+
+
+def _assert_channel_dominates(
+    testcase, rgb, worldid, channel, other_channel
+):
+  testcase.assertGreater(
+      float(rgb[worldid, channel]),
+      float(rgb[worldid, other_channel]) + 0.1,
+      f'world {worldid} channel {channel} should dominate',
+  )
+
 
 def _get_model_data_rc(xml, batch_size, render_seg=False):
   m = tu.load_test_file(xml)
@@ -103,6 +129,53 @@ class RenderTest(parameterized.TestCase):
     self.assertGreater(np.count_nonzero(depth), 0)
     self.assertNotEqual(np.unique(rgb).shape[0], 1)
     self.assertNotEqual(np.unique(depth).shape[0], 1)
+
+  def test_render_per_world_mat_texid_reset(self):
+    """Tests MJX render uses per-world material texture ids."""
+    if not mjxw.WARP_INSTALLED:
+      self.skipTest('Warp not installed.')
+
+    nworld = 2
+    m = mujoco.MjModel.from_xml_string(_TEXTURE_SWAP_XML)
+    mx = mjx.put_model(m, impl='warp')
+    mx = mjx.expand_mat_texid(mx, nworld)
+
+    red_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_TEXTURE, 'red')
+    green_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_TEXTURE, 'green')
+    mat_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_MATERIAL, 'mat')
+
+    mat_texid = mx.mat_texid.at[:, mat_id, 1].set(
+        jp.array([red_id, green_id], dtype=mx.mat_texid.dtype)
+    )
+    mx = mx.replace(mat_texid=mat_texid)
+
+    dx_batch = jax.vmap(functools.partial(tu.make_data, m))(jp.arange(nworld))
+    rc = mjx.create_render_context(
+        mjm=m,
+        nworld=nworld,
+        cam_res=(16, 16),
+        render_rgb=True,
+        render_depth=True,
+        use_textures=True,
+        enable_specular=False,
+        enable_emission=False,
+    )
+    dx_batch = mjx.refit_bvh(mx, dx_batch, rc.pytree())
+
+    rgb_packed, _ = mjx.render(mx, dx_batch, rc.pytree())
+    rgb = np.asarray(mjx.get_rgb(rc.pytree(), 0, rgb_packed)).mean(axis=(1, 2))
+    _assert_channel_dominates(self, rgb, 0, 0, 1)
+    _assert_channel_dominates(self, rgb, 1, 1, 0)
+
+    mat_texid = mx.mat_texid.at[:, mat_id, 1].set(
+        jp.array([green_id, red_id], dtype=mx.mat_texid.dtype)
+    )
+    mx = mx.replace(mat_texid=mat_texid)
+
+    rgb_packed, _ = mjx.render(mx, dx_batch, rc.pytree())
+    rgb = np.asarray(mjx.get_rgb(rc.pytree(), 0, rgb_packed)).mean(axis=(1, 2))
+    _assert_channel_dominates(self, rgb, 0, 1, 0)
+    _assert_channel_dominates(self, rgb, 1, 0, 1)
 
   @parameterized.product(
       xml=('humanoid/humanoid.xml',),
